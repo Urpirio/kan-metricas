@@ -4,6 +4,7 @@ export * from "./generateWorkspacePrefix";
 export * from "./subscriptions";
 export * from "./email";
 export * from "./dueDateFilters";
-export * from "./s3";
+export * from "./storage";
+export * from "./supabase";
 export * from "./mentions";
 export * from "./sanitize";
