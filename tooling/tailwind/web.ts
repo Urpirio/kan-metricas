@@ -58,6 +58,40 @@ export default {
         },
       },
       colors: {
+        // Brand tokens. Kept separate from the neutral `light-*`/`dark-*`
+        // scales so that surfaces stay neutral and only intentional brand
+        // elements (sidebar, accents) pick up colour.
+        // Anchored on the brand navy values: 900 is the sidebar / strong text,
+        // 800 is headings, 700 is strong borders. Lighter steps are tints of
+        // the same hue, used for secondary text and subtle surfaces.
+        brand: {
+          50: "#f4f5f8",
+          100: "#e6e9ef",
+          200: "#c8cedb",
+          300: "#a2abc1",
+          400: "#7480a0",
+          500: "#4e5b80",
+          600: "#2e3d66",
+          700: "#1e2c4e",
+          800: "#1b2748",
+          900: "#141d3b",
+          950: "#0d142a",
+        },
+        // Warm off-white used as the canvas on auth screens.
+        cream: "#f4f2ed",
+        accent: {
+          50: "#fef2f3",
+          100: "#fde3e5",
+          200: "#fbccd0",
+          300: "#f7a5ac",
+          400: "#f1737e",
+          500: "#e63946",
+          600: "#d32636",
+          700: "#b11d2b",
+          800: "#931b28",
+          900: "#7c1b26",
+          950: "#440a10",
+        },
         "dark-50": "#161616",
         "dark-100": "#1c1c1c",
         "dark-200": "#232323",
