@@ -37,6 +37,11 @@ services:
       - NEXT_PUBLIC_USE_STANDALONE_OUTPUT=${NEXT_PUBLIC_USE_STANDALONE_OUTPUT}
       - REDIS_URL=${REDIS_URL}
 
+      # Supabase (required for Supabase Auth and Supabase Storage)
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+
       # Logging (optional - debug, info, warn, error; defaults to debug in dev, info in prod)
       - LOG_LEVEL=${LOG_LEVEL}
       - AXIOM_TOKEN=${AXIOM_TOKEN}
