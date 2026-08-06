@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { deleteUser } from "@kan/auth/server";
 import * as userRepo from "@kan/db/repository/user.repo";
 import { generateAvatarUrl } from "@kan/shared/utils";
 
@@ -168,6 +169,46 @@ export const userRouter = createTRPCRouter({
       } catch {
         throw new TRPCError({
           message: "Failed to set password",
+          code: "INTERNAL_SERVER_ERROR",
+        });
+      }
+
+      return { success: true };
+    }),
+  deleteAccount: protectedProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/users/me/delete",
+        summary: "Delete account",
+        description:
+          "Permanently deletes the authenticated user's account using two-phase deletion (DB + Supabase Auth)",
+        tags: ["Users"],
+        protect: true,
+      },
+    })
+    .input(z.void())
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId)
+        throw new TRPCError({
+          message: `User not authenticated`,
+          code: "UNAUTHORIZED",
+        });
+
+      try {
+        await deleteUser(ctx.db, userId, async (tx) => {
+          // Perform DB deletions/anonymizations within the transaction.
+          // Use the same drizzle client type for the transaction.
+          const { eq } = await import("drizzle-orm");
+          const { users } = await import("@kan/db/schema");
+          await (tx as typeof ctx.db).delete(users).where(eq(users.id, userId));
+        });
+      } catch (error) {
+        throw new TRPCError({
+          message: "Failed to delete account. The deletion was not completed.",
           code: "INTERNAL_SERVER_ERROR",
         });
       }
