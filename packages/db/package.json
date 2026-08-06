@@ -34,11 +34,14 @@
     "build": "tsc",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "tsc",
+    "db:generate-schema-sql": "node scripts/generate-schema-sql.ts",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
     "migrate": "pnpm with-env drizzle-kit migrate",
     "push": "pnpm with-env drizzle-kit push",
     "studio": "pnpm with-env drizzle-kit studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false",
     "with-env": "dotenv -e ../../.env --"
   },
@@ -61,8 +64,10 @@
     "dotenv-cli": "^7.4.4",
     "drizzle-kit": "^0.28.1",
     "eslint": "catalog:",
+    "fast-check": "^4.9.0",
     "prettier": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^3.0.0"
   },
   "prettier": "@kan/prettier-config"
 }
