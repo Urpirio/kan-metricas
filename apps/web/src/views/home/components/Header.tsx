@@ -100,10 +100,7 @@ const Header = ({ isLoggedIn }: { isLoggedIn: boolean }) => {
                   <Button href="/boards">{t`Go to app`}</Button>
                 ) : (
                   <div className="flex items-center justify-end gap-2">
-                    <Button href="/login" variant="ghost">
-                      {t`Sign in`}
-                    </Button>
-                    <Button href="/signup">{t`Get started`}</Button>
+                    <Button href="/login">{t`Sign in`}</Button>
                   </div>
                 )}
               </div>
