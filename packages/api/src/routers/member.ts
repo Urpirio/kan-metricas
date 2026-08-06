@@ -10,6 +10,7 @@ import * as userRepo from "@kan/db/repository/user.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
 import { createLogger } from "@kan/logger";
 import {
+  generatePassword,
   generateUID,
   getSeatLimit,
   getSubscriptionByPlan,
@@ -20,7 +21,10 @@ import { updateSubscriptionSeats } from "@kan/stripe";
 
 const log = createLogger("member-router");
 
-import { memberInviteResponseSchema } from "../schemas";
+import {
+  memberCreateAccountResponseSchema,
+  memberInviteResponseSchema,
+} from "../schemas";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import {
   assertCanManageMember,
@@ -29,6 +33,210 @@ import {
 } from "../utils/permissions";
 
 export const memberRouter = createTRPCRouter({
+  /**
+   * Creates a fully active member account directly, rather than sending an
+   * invitation email. The admin gets a one-time password back to share with
+   * the new member through whatever channel they choose.
+   *
+   * This exists alongside `invite` (which still emails a magic link) so that
+   * workspaces without outbound email configured, or admins who prefer to
+   * hand credentials to their team directly, have a working path to add
+   * members.
+   */
+  createAccount: protectedProcedure
+    .meta({
+      openapi: {
+        summary: "Create a member account directly",
+        method: "POST",
+        path: "/workspaces/{workspacePublicId}/members/create-account",
+        description:
+          "Creates an active member account with a system-generated password, without sending an invitation email",
+        tags: ["Workspaces"],
+        protect: true,
+      },
+    })
+    .input(
+      z.object({
+        email: z.string().email(),
+        name: z.string().min(1).max(255),
+        workspacePublicId: z.string().min(12),
+      }),
+    )
+    .output(memberCreateAccountResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId)
+        throw new TRPCError({
+          message: `User not authenticated`,
+          code: "UNAUTHORIZED",
+        });
+
+      const workspace = await workspaceRepo.getByPublicIdWithMembers(
+        ctx.db,
+        input.workspacePublicId,
+      );
+
+      if (!workspace)
+        throw new TRPCError({
+          message: `Workspace with public ID ${input.workspacePublicId} not found`,
+          code: "NOT_FOUND",
+        });
+
+      await assertPermission(ctx.db, userId, workspace.id, "member:invite");
+
+      const isEmailAlreadyMember = workspace.members.some(
+        (member) => member.email === input.email,
+      );
+
+      if (isEmailAlreadyMember) {
+        throw new TRPCError({
+          message: `User with email ${input.email} is already a member of this workspace`,
+          code: "CONFLICT",
+        });
+      }
+
+      if (process.env.NEXT_PUBLIC_KAN_ENV === "cloud") {
+        const subscriptions = await subscriptionRepo.getByReferenceId(
+          ctx.db,
+          workspace.publicId,
+        );
+
+        const activeTeamSubscription = getSubscriptionByPlan(
+          subscriptions,
+          "team",
+        );
+        const activeProSubscription = getSubscriptionByPlan(
+          subscriptions,
+          "pro",
+        );
+        const unlimitedSeats = hasUnlimitedSeats(subscriptions);
+
+        if (!activeTeamSubscription && !activeProSubscription) {
+          throw new TRPCError({
+            message: `Workspace with public ID ${workspace.publicId} does not have an active subscription`,
+            code: "NOT_FOUND",
+          });
+        }
+
+        if (activeTeamSubscription?.stripeSubscriptionId && !unlimitedSeats) {
+          try {
+            await updateSubscriptionSeats(
+              activeTeamSubscription.stripeSubscriptionId,
+              1,
+            );
+          } catch (error) {
+            log.error(
+              { err: error, workspacePublicId: workspace.publicId },
+              "Failed to update Stripe subscription seats",
+            );
+            throw new TRPCError({
+              message: `Failed to update subscription for the new member.`,
+              code: "INTERNAL_SERVER_ERROR",
+            });
+          }
+        }
+
+        const seatLimit = getSeatLimit(subscriptions);
+        if (seatLimit !== null) {
+          const memberCount = await memberRepo.getCountByWorkspaceId(
+            ctx.db,
+            workspace.id,
+          );
+          if (memberCount >= seatLimit) {
+            throw new TRPCError({
+              message: `SEAT_LIMIT_REACHED`,
+              code: "FORBIDDEN",
+            });
+          }
+        }
+      }
+
+      const existingUser = await userRepo.getByEmail(ctx.db, input.email);
+
+      const temporaryPassword = generatePassword();
+      const supabase = createSupabaseServerClient();
+
+      let authUserId: string;
+
+      if (existingUser) {
+        // A `user` row can exist without a corresponding Supabase Auth
+        // identity (e.g. rows provisioned by other flows), so this branch
+        // still needs to ensure the auth side exists and has a known password.
+        const { error: updateError } =
+          await supabase.auth.admin.updateUserById(existingUser.id, {
+            password: temporaryPassword,
+          });
+
+        if (updateError) {
+          log.error(
+            { err: updateError, email: input.email },
+            "Failed to set password for existing user during member creation",
+          );
+          throw new TRPCError({
+            message: `Failed to create account for ${input.email}.`,
+            code: "INTERNAL_SERVER_ERROR",
+          });
+        }
+
+        authUserId = existingUser.id;
+      } else {
+        const { data: createdUser, error: createError } =
+          await supabase.auth.admin.createUser({
+            email: input.email,
+            password: temporaryPassword,
+            email_confirm: true,
+            user_metadata: { name: input.name },
+          });
+
+        if (createError || !createdUser.user) {
+          log.error(
+            { err: createError, email: input.email },
+            "Failed to create Supabase Auth user during member creation",
+          );
+          throw new TRPCError({
+            message: `Failed to create account for ${input.email}.`,
+            code: "INTERNAL_SERVER_ERROR",
+          });
+        }
+
+        authUserId = createdUser.user.id;
+
+        await userRepo.ensureExists(ctx.db, {
+          id: authUserId,
+          email: input.email,
+          name: input.name,
+        });
+      }
+
+      const memberRole = await permissionRepo.getRoleByWorkspaceIdAndName(
+        ctx.db,
+        workspace.id,
+        "member",
+      );
+
+      const member = await memberRepo.create(ctx.db, {
+        workspaceId: workspace.id,
+        email: input.email,
+        userId: authUserId,
+        createdBy: userId,
+        role: "member",
+        roleId: memberRole?.id ?? null,
+        status: "active",
+      });
+
+      if (!member)
+        throw new TRPCError({
+          message: `Unable to create account for ${input.email}`,
+          code: "INTERNAL_SERVER_ERROR",
+        });
+
+      return {
+        publicId: member.publicId,
+        email: input.email,
+        temporaryPassword,
+      };
+    }),
   invite: protectedProcedure
     .meta({
       openapi: {
