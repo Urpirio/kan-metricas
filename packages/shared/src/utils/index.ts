@@ -1,4 +1,5 @@
 export * from "./generateUID";
+export * from "./generatePassword";
 export * from "./generateSlug";
 export * from "./generateWorkspacePrefix";
 export * from "./subscriptions";
