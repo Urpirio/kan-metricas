@@ -72,7 +72,7 @@ export default function HomeView() {
             </p>
 
             <div className="mt-6 flex gap-2">
-              <Button href="/signup">{t`Get started on Cloud`}</Button>
+              <Button href="/login">{t`Get started on Cloud`}</Button>
               <Button
                 variant="secondary"
                 href="https://github.com/kanbn/kan"
