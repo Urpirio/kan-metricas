@@ -5,9 +5,9 @@ mode: "wide"
 tag: "NEW"
 ---
 
-This guide introduces how to self-host Kan. It starts with the minimal Docker Compose setup (web + PostgreSQL) and points you to optional features like email and S3-based file storage.
+This guide introduces how to self-host Kan. It starts with the minimal Docker Compose setup (web + PostgreSQL) and points you to optional features like email and file storage.
 
-## What you’ll set up
+## What you'll set up
 
 <CardGroup cols={2}>
   <Card title="Kan" icon="globe" color="#0284c7" horizontal>
@@ -19,9 +19,9 @@ This guide introduces how to self-host Kan. It starts with the minimal Docker Co
 </CardGroup>
 
 <Note>
-  For file uploads (avatars), OAuth, and other advanced options, see the
-  Environment Variables section in the README and the dedicated [S3
-  guide](/guides/self-hosting/s3). The [full
+  For authentication, file uploads (avatars), and OAuth, a Supabase project is
+  required. See the dedicated [Supabase guide](/guides/self-hosting/supabase).
+  For the full environment variable list, see the README. The [full
   compose](https://github.com/kanbn/kan/blob/main/docker-compose.yml) in the
   repo includes a richer configuration via <code>.env</code>.
 </Note>
@@ -30,6 +30,7 @@ This guide introduces how to self-host Kan. It starts with the minimal Docker Co
 
 - Docker and Docker Compose
 - A long random string for <code>BETTER_AUTH_SECRET</code> (32+ chars)
+- A Supabase project (cloud or self-hosted) — required for authentication and file storage. See the dedicated [Supabase guide](/guides/self-hosting/supabase) for setup instructions.
 
 ## Quick start
 
@@ -50,6 +51,9 @@ This guide introduces how to self-host Kan. It starts with the minimal Docker Co
           NEXT_PUBLIC_BASE_URL: http://localhost:3000
           BETTER_AUTH_SECRET: your_auth_secret
           POSTGRES_URL: postgresql://kan:your_postgres_password@postgres:5432/kan_db
+          NEXT_PUBLIC_SUPABASE_URL: https://your-project.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: your_anon_key
+          SUPABASE_SERVICE_ROLE_KEY: your_service_role_key
           NEXT_PUBLIC_ALLOW_CREDENTIALS: true
         depends_on:
           - postgres
@@ -78,7 +82,7 @@ This guide introduces how to self-host Kan. It starts with the minimal Docker Co
     ```
 
     <Tip>
-      The example above is intentionally minimal. The repository provides a more feature-complete compose file at [docker-compose.yml](https://github.com/kanbn/kan/blob/main/docker-compose.yml) if you want environment-based configuration, OAuth, S3, and more.
+      The example above is intentionally minimal. The repository provides a more feature-complete compose file at [docker-compose.yml](https://github.com/kanbn/kan/blob/main/docker-compose.yml) if you want environment-based configuration, OAuth, and more.
     </Tip>
 
   </Step>
@@ -104,7 +108,7 @@ This guide introduces how to self-host Kan. It starts with the minimal Docker Co
   </Step>
 
   <Step title="Configure environment (optional)">
-    For a production-like setup and more features (email, OAuth, file uploads, etc.), create a <code>.env</code> file and set the relevant variables shown in the README’s Environment Variables section.
+    For a production-like setup and more features (email, OAuth, etc.), create a <code>.env</code> file and set the relevant variables shown in the README's Environment Variables section.
 
     <Accordion title="Common variables">
       ```bash
@@ -112,6 +116,11 @@ This guide introduces how to self-host Kan. It starts with the minimal Docker Co
       NEXT_PUBLIC_BASE_URL=http://localhost:3000
       BETTER_AUTH_SECRET=replace_with_long_random_string
       POSTGRES_URL=postgresql://kan:your_postgres_password@postgres:5432/kan_db
+
+      # Required: Supabase (Auth and Storage)
+      NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+      SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
       # Optional: Email
       EMAIL_FROM="Kan <hello@mail.kan.bn>"
@@ -127,7 +136,10 @@ This guide introduces how to self-host Kan. It starts with the minimal Docker Co
       ```
 
       <Note type="warning">
-        If you plan to enable file uploads (avatars, etc.), you’ll also need S3 variables (<code>S3_ENDPOINT</code>, <code>S3_ACCESS_KEY_ID</code>, <code>S3_SECRET_ACCESS_KEY</code>, <code>NEXT_PUBLIC_STORAGE_URL</code>, <code>NEXT_PUBLIC_STORAGE_DOMAIN</code>, …). See the S3 guide linked at the top.
+        A Supabase project is required for authentication and file storage. See
+        the [Supabase guide](/guides/self-hosting/supabase) for how to obtain
+        your credentials. You can use Supabase Cloud or self-host Supabase via
+        Docker.
       </Note>
     </Accordion>
 
