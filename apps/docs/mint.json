@@ -51,7 +51,9 @@
           "group": "Self-Hosting",
           "pages": [
             "guides/self-hosting/introduction",
-            "guides/self-hosting/s3"
+            "guides/self-hosting/supabase",
+            "guides/self-hosting/s3",
+            "guides/self-hosting/supabase-vercel"
           ]
         }
       ]
