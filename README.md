@@ -173,6 +173,10 @@ pnpm dev
 | Variable                                  | Description                                               | Required                                    | Example                                                     |
 | ----------------------------------------- | --------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------- |
 | `POSTGRES_URL`                            | PostgreSQL connection URL                                 | To use external database                    | `postgres://user:pass@localhost:5432/db`                    |
+| `POSTGRES_URL_NON_POOLING`                | Direct (non-pooled) connection URL used for migrations    | When using Supabase pooling (else optional) | `postgres://user:pass@localhost:5432/db`                    |
+| `NEXT_PUBLIC_SUPABASE_URL`                | URL of your Supabase project                              | Yes (for Supabase Auth & Storage)           | `https://<project-ref>.supabase.co`                         |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`           | Supabase anonymous key (public, safe for browser)         | Yes (for Supabase Auth & Storage)           | `eyJhbGciOi...`                                             |
+| `SUPABASE_SERVICE_ROLE_KEY`               | Supabase service role key (server-only, never expose)     | Yes (for Supabase Auth & Storage)           | `eyJhbGciOi...`                                             |
 | `REDIS_URL`                               | Redis connection URL                                      | For rate limiting (optional)                | `redis://localhost:6379` or `redis://redis:6379` (Docker)   |
 | `EMAIL_FROM`                              | Sender email address                                      | For Email                                   | `"Kan <hello@mail.kan.bn>"`                                 |
 | `SMTP_HOST`                               | SMTP server hostname                                      | For Email                                   | `smtp.resend.com`                                           |
