@@ -5,12 +5,19 @@ import * as cardRepo from "@kan/db/repository/card.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
 import * as cardAttachmentRepo from "@kan/db/repository/cardAttachment.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
-import { generateUID } from "@kan/shared/utils";
+import { createLogger } from "@kan/logger";
+import {
+  deleteObject,
+  generateUID,
+  generateUploadUrl,
+  validateUploadRequest,
+} from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { attachmentConfirmResponseSchema } from "../schemas";
 import { assertPermission } from "../utils/permissions";
-import { deleteObject, generateUploadUrl } from "@kan/shared/utils";
+
+const log = createLogger("attachment");
 
 export const attachmentRouter = createTRPCRouter({
   generateUploadUrl: protectedProcedure
@@ -73,6 +80,37 @@ export const attachmentRouter = createTRPCRouter({
           code: "INTERNAL_SERVER_ERROR",
         });
 
+      // Validate upload request against limits
+      const validation = validateUploadRequest(
+        { size: input.size, contentType: input.contentType },
+        {
+          maxSizeBytes: 50 * 1024 * 1024, // 50MB
+          allowedContentTypes: [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/plain",
+            "text/csv",
+            "application/zip",
+            "video/mp4",
+            "audio/mpeg",
+          ],
+        },
+      );
+
+      if (!validation.valid) {
+        throw new TRPCError({
+          message: validation.reason,
+          code: "BAD_REQUEST",
+        });
+      }
+
       // Sanitize filename
       const sanitizedFilename = input.filename
         .replace(/[^a-zA-Z0-9._-]/g, "_")
@@ -84,7 +122,7 @@ export const attachmentRouter = createTRPCRouter({
         bucket,
         s3Key,
         input.contentType,
-        3600, // 1 hour
+        60, // 60 seconds max for upload URLs
       );
 
       return { url, key: s3Key };
@@ -201,9 +239,9 @@ export const attachmentRouter = createTRPCRouter({
         try {
           await deleteObject(bucket, attachment.s3Key);
         } catch (error) {
-          console.error(
-            `Failed to delete attachment from S3: ${attachment.s3Key}`,
-            error,
+          log.error(
+            { err: error, key: attachment.s3Key },
+            `Failed to delete attachment from storage: ${attachment.s3Key}`,
           );
         }
       }
