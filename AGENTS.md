@@ -241,6 +241,7 @@ Update all of the following:
 
 - Always create migrations (never modify existing migrations)
 - Create migrations with: `cd packages/db && pnpm drizzle-kit generate --name "MigrationName"`
+- After generating a new migration with `drizzle-kit generate`, regenerate the Supabase schema SQL by running `pnpm db:generate-schema-sql` (from `packages/db`) and commit the updated `packages/db/supabase/schema.sql`. This file is the concatenation of all migrations in chronological order and must stay in sync with `packages/db/migrations/`; it lets operators provision the schema directly in the Supabase SQL editor.
 - Run migrations with: `pnpm db:migrate`
 - Update schema files in `packages/db/src/schema/`
 - Test migrations on development database first
