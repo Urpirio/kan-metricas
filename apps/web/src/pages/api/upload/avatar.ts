@@ -1,11 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 import { createNextApiContext } from "@kan/api/trpc";
 import { withApiLogging } from "@kan/api/utils/apiLogging";
 import { withRateLimit } from "@kan/api/utils/rateLimit";
 import * as userRepo from "@kan/db/repository/user.repo";
-import { createS3Client } from "@kan/shared/utils";
+import { createSupabaseServerClient } from "@kan/shared/utils/supabase-server";
 
 import { env } from "~/env";
 
@@ -80,18 +79,22 @@ export default withRateLimit(
 
       const s3Key = `${user.id}/${sanitizedFilename}`;
 
-      const client = createS3Client();
+      // Collect the request body into a buffer for Supabase Storage upload
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const body = Buffer.concat(chunks);
 
-      // Upload the file to S3
-      await client.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: s3Key,
-          Body: req,
-          ContentType: contentType,
-          ContentLength: contentLength,
-        }),
-      );
+      const supabase = createSupabaseServerClient();
+      const { error } = await supabase.storage.from(bucket).upload(s3Key, body, {
+        contentType,
+        upsert: true,
+      });
+
+      if (error) {
+        throw error;
+      }
 
       // Update user image in database
       const updatedUser = await userRepo.update(db, user.id, {
