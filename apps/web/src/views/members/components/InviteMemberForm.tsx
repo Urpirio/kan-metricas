@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { env } from "next-runtime-env";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -11,7 +12,6 @@ import {
 } from "react-icons/hi2";
 import { z } from "zod";
 
-import type { InviteMemberInput } from "@kan/api/types";
 import type { Subscription } from "@kan/shared/utils";
 import { getSubscriptionByPlan } from "@kan/shared/utils";
 
@@ -22,6 +22,23 @@ import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
+
+const CreateAccountSchema = z.object({
+  name: z.string().min(1, { message: t`Name is required` }),
+  email: z.string().email({ message: t`Invalid email address` }),
+});
+
+type CreateAccountFormValues = z.infer<typeof CreateAccountSchema>;
+
+/**
+ * Result of the most recently created account, shown once so the admin can
+ * copy the credentials and share them with the new member. The password is
+ * never retrievable again after this modal closes.
+ */
+interface CreatedAccount {
+  email: string;
+  password: string;
+}
 
 export function InviteMemberForm({
   subscriptions,
@@ -40,28 +57,22 @@ export function InviteMemberForm({
   const [inviteLink, setInviteLink] = useState<string>("");
   const [_isLoadingInviteLink, setIsLoadingInviteLink] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [createdAccount, setCreatedAccount] = useState<CreatedAccount | null>(
+    null,
+  );
+  const [passwordCopied, setPasswordCopied] = useState(false);
   const { closeModal } = useModal();
   const { workspace } = useWorkspace();
   const { showPopup } = usePopup();
-
-  const isEmailEnabled = env("NEXT_PUBLIC_DISABLE_EMAIL") !== "true";
-
-  const InviteMemberSchema = z.object({
-    email: z.string().email({ message: t`Invalid email address` }),
-    workspacePublicId: z.string(),
-  });
 
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<InviteMemberInput>({
-    defaultValues: {
-      email: "",
-      workspacePublicId: workspace.publicId || "",
-    },
-    resolver: zodResolver(InviteMemberSchema),
+  } = useForm<CreateAccountFormValues>({
+    defaultValues: { name: "", email: "" },
+    resolver: zodResolver(CreateAccountSchema),
   });
 
   const refetchBoards = () => utils.board.all.refetch();
@@ -81,19 +92,17 @@ export function InviteMemberForm({
     }
   }, [activeInviteLink]);
 
-  const inviteMember = api.member.invite.useMutation({
-    onSuccess: async () => {
-      closeModal();
+  const createAccount = api.member.createAccount.useMutation({
+    onSuccess: async (data) => {
+      setCreatedAccount({ email: data.email, password: data.temporaryPassword });
+      reset();
       await utils.workspace.byId.refetch();
       await refetchBoards();
     },
     onError: (error) => {
-      reset();
-      if (!isShareInviteLinkEnabled) closeModal();
-
       if (error.data?.code === "CONFLICT") {
         showPopup({
-          header: t`Error inviting member`,
+          header: t`Error creating account`,
           message: t`User is already a member of this workspace`,
           icon: "error",
         });
@@ -108,7 +117,7 @@ export function InviteMemberForm({
         });
       } else {
         showPopup({
-          header: t`Error inviting member`,
+          header: t`Error creating account`,
           message: t`Please try again later, or contact customer support.`,
           icon: "error",
         });
@@ -182,8 +191,12 @@ export function InviteMemberForm({
     billingType = isYearly ? t`billed annually` : t`billed monthly`;
   }
 
-  const onSubmit = (member: InviteMemberInput) => {
-    inviteMember.mutate(member);
+  const onSubmit = (values: CreateAccountFormValues) => {
+    createAccount.mutate({
+      name: values.name,
+      email: values.email,
+      workspacePublicId: workspace.publicId || "",
+    });
   };
 
   const isFreePlan =
@@ -197,13 +210,11 @@ export function InviteMemberForm({
     setIsLoadingInviteLink(true);
 
     if (isShareInviteLinkEnabled && workspace.publicId) {
-      // Deactivate invite link
       await deactivateInviteLink.mutateAsync({
         workspacePublicId: workspace.publicId,
       });
       setIsShareInviteLinkEnabled(false);
     } else {
-      // Create new invite link
       await createInviteLink.mutateAsync({
         workspacePublicId: workspace.publicId,
       });
@@ -211,30 +222,105 @@ export function InviteMemberForm({
     }
   };
 
-  const copyToClipboard = async () => {
+  const copyToClipboard = async (
+    value: string,
+    onCopied: (copied: boolean) => void,
+  ) => {
     try {
-      await navigator.clipboard.writeText(inviteLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      showPopup({
-        header: t`Invite link copied`,
-        message: t`Invite link copied to clipboard`,
-        icon: "success",
-      });
+      await navigator.clipboard.writeText(value);
+      onCopied(true);
+      setTimeout(() => onCopied(false), 2000);
     } catch {
       showPopup({
         header: t`Error`,
-        message: t`Failed to copy invite link`,
+        message: t`Failed to copy to clipboard`,
         icon: "error",
       });
     }
   };
 
   useEffect(() => {
-    const emailElement: HTMLElement | null =
-      document.querySelector<HTMLElement>("#email");
-    if (emailElement) emailElement.focus();
+    const nameElement: HTMLElement | null =
+      document.querySelector<HTMLElement>("#name");
+    if (nameElement) nameElement.focus();
   }, []);
+
+  // Once an account has been created, show the credentials instead of the
+  // form. This is the only time the password is available, so the admin
+  // must copy it here before closing the modal.
+  if (createdAccount) {
+    return (
+      <div>
+        <div className="px-5 pt-5">
+          <div className="text-neutral-9000 flex w-full items-center justify-between pb-4 dark:text-dark-1000">
+            <h2 className="text-sm font-bold">{t`Account created`}</h2>
+            <button
+              type="button"
+              className="rounded p-1 hover:bg-light-300 focus:outline-none dark:hover:bg-dark-300"
+              onClick={closeModal}
+            >
+              <HiXMark size={18} className="dark:text-dark-9000 text-light-900" />
+            </button>
+          </div>
+
+          <p className="mb-4 text-sm text-light-900 dark:text-dark-900">
+            <Trans>
+              Share these credentials with {createdAccount.email} so they can
+              sign in.
+            </Trans>
+          </p>
+
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-light-900 dark:text-dark-900">
+                {t`Email`}
+              </label>
+              <Input value={createdAccount.email} readOnly />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-light-900 dark:text-dark-900">
+                {t`Temporary password`}
+              </label>
+              <div className="relative">
+                <Input
+                  value={createdAccount.password}
+                  className="pr-10 font-mono text-sm"
+                  readOnly
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-light-900 hover:text-light-950 dark:text-dark-900 dark:hover:text-dark-950"
+                  onClick={() =>
+                    copyToClipboard(createdAccount.password, setPasswordCopied)
+                  }
+                >
+                  {passwordCopied ? (
+                    <HiMiniCheck className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <HiOutlineDocumentDuplicate className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-1">
+              <HiInformationCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-dark-900" />
+              <p className="text-xs text-gray-500 dark:text-dark-900">
+                {t`This password won't be shown again. The member can change it after signing in.`}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 flex items-center justify-end space-x-4 border-t border-light-600 px-5 pb-5 pt-5 dark:border-dark-600">
+          <Button type="button" onClick={() => setCreatedAccount(null)}>
+            {t`Add another`}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
@@ -243,7 +329,7 @@ export function InviteMemberForm({
           <h2 className="text-sm font-bold">{t`Add member`}</h2>
           <button
             type="button"
-            className="hover:bg-li ght-300 rounded p-1 focus:outline-none dark:hover:bg-dark-300"
+            className="rounded p-1 hover:bg-light-300 focus:outline-none dark:hover:bg-dark-300"
             onClick={(e) => {
               e.preventDefault();
               closeModal();
@@ -252,7 +338,15 @@ export function InviteMemberForm({
             <HiXMark size={18} className="dark:text-dark-9000 text-light-900" />
           </button>
         </div>
-        {isEmailEnabled && (
+
+        <div className="space-y-2">
+          <Input
+            id="name"
+            placeholder={t`Full name`}
+            disabled={isFreePlan}
+            {...register("name", { required: true })}
+            errorMessage={errors.name?.message}
+          />
           <Input
             id="email"
             placeholder={t`Email`}
@@ -266,20 +360,28 @@ export function InviteMemberForm({
             }}
             errorMessage={errors.email?.message}
           />
-        )}
-        {!isFreePlan &&
-          (!isEmailEnabled || (isShareInviteLinkEnabled && inviteLink)) && (
-            <div className="my-4">
-              <div className="relative">
-                <Input
-                  value={inviteLink}
-                  className="pr-10 text-sm text-light-900 dark:text-dark-900"
-                  readOnly
-                />
+        </div>
+
+        <p className="mt-2 text-xs text-gray-500 dark:text-dark-900">
+          {t`Creates an active account with a system-generated password. No invitation email is sent — you'll get the credentials to share directly.`}
+        </p>
+
+        {!isFreePlan && (
+          <div className="my-4">
+            <div className="relative">
+              <Input
+                value={inviteLink}
+                className="pr-10 text-sm text-light-900 dark:text-dark-900"
+                readOnly
+                placeholder={
+                  isShareInviteLinkEnabled ? undefined : t`No active link`
+                }
+              />
+              {inviteLink && (
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-light-900 hover:text-light-950 dark:text-dark-900 dark:hover:text-dark-950"
-                  onClick={copyToClipboard}
+                  onClick={() => copyToClipboard(inviteLink, setCopied)}
                 >
                   {copied ? (
                     <HiMiniCheck className="h-5 w-5 text-green-600" />
@@ -287,15 +389,18 @@ export function InviteMemberForm({
                     <HiOutlineDocumentDuplicate className="h-5 w-5" />
                   )}
                 </button>
-              </div>
+              )}
+            </div>
+            {isShareInviteLinkEnabled && inviteLink && (
               <div className="mt-2 flex items-start gap-1">
                 <HiInformationCircle className="mt-0.5 h-4 w-4 text-dark-900" />
                 <p className="text-xs text-gray-500 dark:text-dark-900">
                   {t`Anyone with this link can join your workspace`}
                 </p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
         {env("NEXT_PUBLIC_KAN_ENV") === "cloud" &&
           (isPartnerTier && seatLimit !== null ? (
@@ -326,7 +431,7 @@ export function InviteMemberForm({
                     {t`Free Plan`}
                   </span>
                   <p className="mt-1">
-                    {t`Inviting members requires a Team or Pro plan. You'll be redirected to upgrade your workspace.`}
+                    {t`Adding members requires a Team or Pro plan. You'll be redirected to upgrade your workspace.`}
                   </p>
                 </div>
               )}
@@ -334,7 +439,7 @@ export function InviteMemberForm({
           ) : null)}
       </div>
 
-      <div className="mt-12 flex items-center justify-end space-x-4 border-t border-light-600 px-5 pb-5 pt-5 dark:border-dark-600">
+      <div className="mt-8 flex items-center justify-end space-x-4 border-t border-light-600 px-5 pb-5 pt-5 dark:border-dark-600">
         {!isFreePlan && (
           <Toggle
             label={
@@ -357,10 +462,10 @@ export function InviteMemberForm({
           ) : (
             <Button
               type="submit"
-              disabled={inviteMember.isPending || !isEmailEnabled}
-              isLoading={inviteMember.isPending}
+              disabled={createAccount.isPending}
+              isLoading={createAccount.isPending}
             >
-              {t`Invite member`}
+              {t`Create account`}
             </Button>
           )}
         </div>
