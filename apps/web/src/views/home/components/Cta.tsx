@@ -56,7 +56,7 @@ const Cta = ({ theme }: { theme: string }) => {
           <p className="text-md/8 mx-auto mt-6 max-w-[375px] text-pretty text-light-950 dark:text-dark-900">
             {t`Unlimited boards, unlimited lists, unlimited cards. No credit card required.`}
           </p>
-          <Link href="/signup">
+          <Link href="/login">
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Button size="lg">{t`Get started`}</Button>
             </div>
