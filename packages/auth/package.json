@@ -26,20 +26,22 @@
   },
   "devDependencies": {
     "@kan/db": "workspace:*",
-    "@kan/email": "workspace:*",
     "@kan/eslint-config": "workspace:*",
     "@kan/prettier-config": "workspace:*",
     "@kan/shared": "workspace:*",
-    "@kan/stripe": "workspace:*",
     "@kan/tsconfig": "workspace:*",
     "eslint": "catalog:",
+    "fast-check": "^4.9.0",
     "prettier": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^3.0.0"
   },
   "prettier": "@kan/prettier-config",
   "dependencies": {
-    "@better-auth/stripe": "^1.4.6",
     "@kan/logger": "workspace:^",
-    "better-auth": "^1.4.6"
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.112.0",
+    "next-runtime-env": "^1.7.2",
+    "react": "catalog:react18"
   }
 }
