@@ -126,3 +126,44 @@ export const update = async (
 
   return result;
 };
+
+/**
+ * Ensures a row exists in the application `user` table for an already
+ * authenticated Supabase Auth user.
+ *
+ * Supabase Auth owns the identity records in its own `auth.users` table, so a
+ * matching application row must be provisioned before any entity that
+ * references `user.id` (workspaces, boards, cards, ...) can be created.
+ * Without this, inserts fail on foreign keys such as
+ * `workspace_createdBy_user_id_fk`.
+ *
+ * The insert is idempotent: concurrent requests for the same user resolve to a
+ * single row via `onConflictDoNothing`, and the existing row is returned.
+ */
+export const ensureExists = async (
+  db: dbClient,
+  user: { id: string; email: string; name?: string; image?: string | null },
+) => {
+  const existing = await db.query.users.findFirst({
+    columns: { id: true },
+    where: eq(users.id, user.id),
+  });
+
+  if (existing) return existing;
+
+  await db
+    .insert(users)
+    .values({
+      id: user.id,
+      email: user.email,
+      name: user.name ?? user.email,
+      image: user.image ?? null,
+      emailVerified: true,
+    })
+    .onConflictDoNothing({ target: users.id });
+
+  return db.query.users.findFirst({
+    columns: { id: true },
+    where: eq(users.id, user.id),
+  });
+};
