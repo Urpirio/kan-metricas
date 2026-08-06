@@ -31,9 +31,9 @@
     }
   ],
   "orientation": "portrait-primary",
-  "name": "Kan.bn | The open source alternative to Trello",
+  "name": "Metricas",
   "scope": "/",
-  "short_name": "Kan.bn",
+  "short_name": "Metricas",
   "start_url": "/",
-  "theme_color": "#000000"
+  "theme_color": "#1e2749"
 }
