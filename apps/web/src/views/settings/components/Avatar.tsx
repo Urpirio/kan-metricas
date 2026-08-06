@@ -165,18 +165,18 @@ export default function Avatar({
       const originalExt = selectedFile.name.split(".").pop() ?? "jpg";
       const fileName = `${userId}/avatar-${generateUID()}.${originalExt}`;
 
-      const baseUrl = env("NEXT_PUBLIC_BASE_URL") ?? "";
-      const response = await fetch(
-        `${baseUrl}/api/upload/avatar`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": blob.type,
-            "x-original-filename": encodeURIComponent(fileName),
-          },
-          body: blob,
+      // Relative URL keeps the request same-origin, so the browser sends the
+      // session cookies and skips the CORS preflight. Building an absolute URL
+      // from NEXT_PUBLIC_BASE_URL triggers an OPTIONS request that the upload
+      // route rejects with 405.
+      const response = await fetch("/api/upload/avatar", {
+        method: "POST",
+        headers: {
+          "Content-Type": blob.type,
+          "x-original-filename": encodeURIComponent(fileName),
         },
-      );
+        body: blob,
+      });
 
       if (!response.ok) {
         throw new Error("Failed to upload profile image");
