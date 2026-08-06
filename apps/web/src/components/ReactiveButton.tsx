@@ -49,7 +49,7 @@ const Button: React.FC<{
         "group flex h-[34px] items-center rounded-md p-1.5 text-sm font-normal leading-6 hover:bg-light-200 hover:text-light-1000 dark:hover:bg-dark-200 dark:hover:text-dark-1000",
         isCollapsed ? "md:justify-center" : "justify-between",
         current
-          ? "bg-light-200 text-light-1000 dark:bg-dark-200 dark:text-dark-1000"
+          ? "bg-brand-100 font-medium text-brand-800 dark:bg-dark-200 dark:text-dark-1000"
           : "text-neutral-600 dark:bg-dark-100 dark:text-dark-900",
       )}
       title={isCollapsed ? name : undefined}
