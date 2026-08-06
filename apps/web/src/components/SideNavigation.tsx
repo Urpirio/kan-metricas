@@ -159,8 +159,14 @@ export default function SideNavigation({
           <div className="hidden h-[45px] items-center justify-between pb-3 md:flex">
             {!isCollapsed && (
               <Link href="/" className="block">
-                <h1 className="pl-2 text-[16px] font-bold tracking-tight text-neutral-900 dark:text-dark-1000">
-                  kan.bn
+                <h1 className="flex items-center gap-2 pl-2 text-[16px] font-bold tracking-tight text-brand-800 dark:text-dark-1000">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-6 w-6 items-center justify-center rounded-md bg-accent-500 text-[13px] font-bold text-white"
+                  >
+                    M
+                  </span>
+                  METRICAS
                 </h1>
               </Link>
             )}
