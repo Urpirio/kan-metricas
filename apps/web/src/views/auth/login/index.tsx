@@ -1,8 +1,5 @@
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { t } from "@lingui/core/macro";
-import { Trans } from "@lingui/react/macro";
-import { env } from "next-runtime-env";
 
 import { authClient } from "@kan/auth/client";
 
@@ -12,7 +9,6 @@ import { PageHead } from "~/components/PageHead";
 
 export default function LoginPage() {
   const router = useRouter();
-  const isSignUpDisabled = env("NEXT_PUBLIC_DISABLE_SIGN_UP") === "true";
 
   const redirect = useSearchParams().get("next");
 
@@ -37,19 +33,6 @@ export default function LoginPage() {
         <div className="mt-8">
           <Auth />
         </div>
-
-        {(!isSignUpDisabled || redirect?.startsWith("/invite/")) && (
-          <p className="mt-8 text-sm text-brand-500 dark:text-dark-900">
-            <Trans>
-              Don't have an account?{" "}
-              <span className="font-medium text-accent-600 underline dark:text-accent-400">
-                <Link href={redirect ? `/signup?next=${redirect}` : "/signup"}>
-                  Sign up
-                </Link>
-              </span>
-            </Trans>
-          </p>
-        )}
       </AuthLayout>
     </>
   );
