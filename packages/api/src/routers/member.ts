@@ -8,13 +8,17 @@ import * as permissionRepo from "@kan/db/repository/permission.repo";
 import * as subscriptionRepo from "@kan/db/repository/subscription.repo";
 import * as userRepo from "@kan/db/repository/user.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
+import { createLogger } from "@kan/logger";
 import {
   generateUID,
   getSeatLimit,
   getSubscriptionByPlan,
   hasUnlimitedSeats,
 } from "@kan/shared";
+import { createSupabaseServerClient } from "@kan/shared/utils/supabase-server";
 import { updateSubscriptionSeats } from "@kan/stripe";
+
+const log = createLogger("member-router");
 
 import { memberInviteResponseSchema } from "../schemas";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -156,16 +160,20 @@ export const memberRouter = createTRPCRouter({
           code: "INTERNAL_SERVER_ERROR",
         });
 
-      const { status } = await ctx.auth.api.signInMagicLink({
+      const baseUrl = env("NEXT_PUBLIC_BASE_URL") ?? "";
+      const supabase = createSupabaseServerClient();
+      const { error: otpError } = await supabase.auth.signInWithOtp({
         email: input.email,
-        callbackURL: `/boards?type=invite&memberPublicId=${invite.publicId}`,
+        options: {
+          emailRedirectTo: `${baseUrl}/auth/callback?type=invite&memberPublicId=${invite.publicId}`,
+        },
       });
 
-      if (!status) {
-        console.error("Failed to send magic link invitation:", {
-          email: input.email,
-          callbackURL: `/boards?type=invite&memberPublicId=${invite.publicId}`,
-        });
+      if (otpError) {
+        log.error(
+          { err: otpError, email: input.email, memberPublicId: invite.publicId },
+          "Failed to send magic link invitation",
+        );
 
         await memberRepo.softDelete(ctx.db, {
           memberId: invite.id,
