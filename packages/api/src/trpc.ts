@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
-import type { NextApiRequest } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import type { OpenApiMeta } from "trpc-to-openapi";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { env } from "next-runtime-env";
@@ -8,11 +8,42 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 
 import type { dbClient } from "@kan/db/client";
-import { initAuth } from "@kan/auth/server";
+import { getSession, signInWithPassword, setUserPassword } from "@kan/auth/server";
 import { createDrizzleClient } from "@kan/db/client";
+import * as userRepo from "@kan/db/repository/user.repo";
 import { createLogger } from "@kan/logger";
+import { createSupabaseServerClient } from "@kan/shared/utils/supabase-server";
 
 const log = createLogger("api");
+
+/**
+ * Provisions the application `user` row for a Supabase Auth session.
+ *
+ * Supabase Auth stores identities in its own `auth.users` table, so the first
+ * authenticated request for a user must create the matching application row
+ * before any entity referencing `user.id` can be inserted. This runs on every
+ * authenticated request and is a cheap no-op once the row exists.
+ *
+ * A failure here is logged rather than thrown so that the request proceeds and
+ * surfaces its own error, instead of masking it with a context-creation error.
+ */
+async function syncUser(db: dbClient, user: User | null | undefined) {
+  if (!user?.id || !user.email) return;
+
+  try {
+    await userRepo.ensureExists(db, {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      image: user.image ?? null,
+    });
+  } catch (error) {
+    log.error(
+      { err: error, userId: user.id },
+      "Failed to provision application user row for Supabase Auth user",
+    );
+  }
+}
 
 const TRPC_STATUS_MAP: Partial<Record<TRPCError["code"], number>> = {
   PARSE_ERROR: 400,
@@ -46,36 +77,16 @@ export interface User {
   stripeCustomerId?: string | null | undefined;
 }
 
-const createAuthWithHeaders = (
-  auth: ReturnType<typeof initAuth>,
-  headers: Headers,
-) => {
-  return {
-    api: {
-      getSession: () => auth.api.getSession({ headers }),
-      signInMagicLink: (input: { email: string; callbackURL: string }) =>
-        auth.api.signInMagicLink({
-          headers,
-          body: { email: input.email, callbackURL: input.callbackURL },
-        }),
-      listActiveSubscriptions: (input: { workspacePublicId: string }) =>
-        auth.api.listActiveSubscriptions({
-          headers,
-          query: { referenceId: input.workspacePublicId },
-        }),
-      setPassword: (input: { newPassword: string }) =>
-        auth.api.setPassword({
-          headers,
-          body: { newPassword: input.newPassword },
-        }),
-    },
-  };
-};
+export interface AuthApi {
+  getSession: () => Promise<{ user: User } | null>;
+  signInMagicLink: (input: { email: string; callbackURL: string }) => Promise<{ status: boolean }>;
+  setPassword: (input: { newPassword: string }) => Promise<void>;
+}
 
 interface CreateContextOptions {
   user: User | null | undefined;
   db: dbClient;
-  auth: ReturnType<typeof createAuthWithHeaders>;
+  auth: { api: AuthApi };
   headers: Headers;
   transport?: "trpc" | "rest";
 }
@@ -91,45 +102,76 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
   };
 };
 
-export const createTRPCContext = async ({ req }: CreateNextContextOptions) => {
+/**
+ * Creates an auth API wrapper compatible with the previous interface.
+ * Uses Supabase Auth via `@kan/auth/server` getSession.
+ */
+function createAuthApi(req: NextApiRequest, res: NextApiResponse): AuthApi {
+  return {
+    getSession: () => getSession(req, res) as Promise<{ user: User } | null>,
+    signInMagicLink: async (input: { email: string; callbackURL: string }) => {
+      const supabase = createSupabaseServerClient();
+      const baseUrl = env("NEXT_PUBLIC_BASE_URL") ?? "";
+      const { error } = await supabase.auth.signInWithOtp({
+        email: input.email,
+        options: {
+          emailRedirectTo: `${baseUrl}${input.callbackURL}`,
+        },
+      });
+      return { status: !error };
+    },
+    setPassword: async (input: { newPassword: string }) => {
+      // This requires knowing the userId from the current session.
+      // The session is already resolved in the context; we use the admin API.
+      const session = await getSession(req, res);
+      if (!session?.user?.id) {
+        throw new Error("No authenticated user to set password for");
+      }
+      await setUserPassword(session.user.id, input.newPassword);
+    },
+  };
+}
+
+export const createTRPCContext = async ({ req, res }: CreateNextContextOptions) => {
   const db = createDrizzleClient();
-  const baseAuth = initAuth(db);
-  const headers = new Headers(req.headers as Record<string, string>);
-  const auth = createAuthWithHeaders(baseAuth, headers);
+  const auth = { api: createAuthApi(req, res) };
 
   const session = await auth.api.getSession();
+  await syncUser(db, session?.user);
 
   return createInnerTRPCContext({
     db,
     user: session?.user,
     auth,
-    headers,
+    headers: new Headers(req.headers as Record<string, string>),
     transport: "trpc",
   });
 };
 
-export const createNextApiContext = async (req: NextApiRequest) => {
+export const createNextApiContext = async (req: NextApiRequest, res?: NextApiResponse) => {
   const db = createDrizzleClient();
-  const baseAuth = initAuth(db);
-  const headers = new Headers(req.headers as Record<string, string>);
-  const auth = createAuthWithHeaders(baseAuth, headers);
+  // If no res is provided, create a minimal no-op response object for cookie reading.
+  // Session will still be read from cookies, but any refreshed tokens won't be persisted.
+  const dummyRes = res ?? ({
+    appendHeader: () => undefined,
+  } as unknown as NextApiResponse);
+  const auth = { api: createAuthApi(req, dummyRes) };
 
   const session = await auth.api.getSession();
+  await syncUser(db, session?.user);
 
   return createInnerTRPCContext({
     db,
     user: session?.user,
     auth,
-    headers,
+    headers: new Headers(req.headers as Record<string, string>),
     transport: "trpc",
   });
 };
 
-export const createRESTContext = async ({ req }: CreateNextContextOptions) => {
+export const createRESTContext = async ({ req, res }: CreateNextContextOptions) => {
   const db = createDrizzleClient();
-  const baseAuth = initAuth(db);
-  const headers = new Headers(req.headers as Record<string, string>);
-  const auth = createAuthWithHeaders(baseAuth, headers);
+  const auth = { api: createAuthApi(req, res) };
 
   let session;
   try {
@@ -138,11 +180,23 @@ export const createRESTContext = async ({ req }: CreateNextContextOptions) => {
     log.warn({ err: error }, "Failed to get session, treating as unauthenticated");
   }
 
+  await syncUser(db, session?.user);
+
+  // If no session, try API key authentication
+  let user = session?.user;
+  if (!user) {
+    const { authenticateApiKey } = await import("./utils/apiKeyMiddleware");
+    const apiKeyResult = await authenticateApiKey({ db, headers: new Headers(req.headers as Record<string, string>) });
+    if (apiKeyResult) {
+      user = { id: apiKeyResult.userId } as User;
+    }
+  }
+
   return createInnerTRPCContext({
     db,
-    user: session?.user,
+    user,
     auth,
-    headers,
+    headers: new Headers(req.headers as Record<string, string>),
     transport: "rest",
   });
 };
@@ -231,6 +285,30 @@ const enforceUserIsAdmin = t.middleware(async ({ ctx, next }) => {
 export const protectedProcedure = t.procedure
   .use(loggingMiddleware)
   .use(enforceUserIsAuthed);
+
+const enforceApiKeyAuth = t.middleware(async ({ ctx, next }) => {
+  const { authenticateApiKey } = await import("./utils/apiKeyMiddleware");
+  const apiKeyResult = await authenticateApiKey({
+    db: ctx.db,
+    headers: ctx.headers,
+  });
+
+  if (!apiKeyResult) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "API key required" });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      user: { id: apiKeyResult.userId } as User,
+      apiKeyPublicId: apiKeyResult.publicId,
+    },
+  });
+});
+
+export const apiKeyProtectedProcedure = t.procedure
+  .use(loggingMiddleware)
+  .use(enforceApiKeyAuth);
 
 export const adminProtectedProcedure = t.procedure
   .use(loggingMiddleware)
