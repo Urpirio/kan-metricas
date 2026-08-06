@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { Upload } from "@aws-sdk/lib-storage";
 
 import { createNextApiContext } from "@kan/api/trpc";
 import { withApiLogging } from "@kan/api/utils/apiLogging";
@@ -8,7 +7,8 @@ import { withRateLimit } from "@kan/api/utils/rateLimit";
 import * as cardRepo from "@kan/db/repository/card.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
 import * as cardAttachmentRepo from "@kan/db/repository/cardAttachment.repo";
-import { createS3Client, generateUID } from "@kan/shared/utils";
+import { generateUID } from "@kan/shared/utils";
+import { createSupabaseServerClient } from "@kan/shared/utils/supabase-server";
 
 import { env } from "~/env";
 
@@ -100,21 +100,21 @@ export default withRateLimit(
 
       const s3Key = `${card.workspaceId}/${cardPublicId}/${generateUID()}-${sanitizedFilename}`;
 
-      const client = createS3Client();
+      // Collect the request body into a buffer for Supabase Storage upload
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const body = Buffer.concat(chunks);
 
-      const upload = new Upload({
-        client,
-        params: {
-          Bucket: bucket,
-          Key: s3Key,
-          Body: req,
-          ContentType: contentType,
-          ContentLength: contentLength,
-        },
-        leavePartsOnError: false,
+      const supabase = createSupabaseServerClient();
+      const { error } = await supabase.storage.from(bucket).upload(s3Key, body, {
+        contentType,
       });
 
-      await upload.done();
+      if (error) {
+        throw error;
+      }
 
       // Create attachment record and log activity
       const attachment = await cardAttachmentRepo.create(db, {
