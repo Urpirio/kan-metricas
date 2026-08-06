@@ -1,7 +1,5 @@
-import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import { TRPCError } from "@trpc/server";
 import { sql } from "drizzle-orm";
-import { env } from "next-runtime-env";
 import { z } from "zod";
 
 import type { dbClient } from "@kan/db/client";
@@ -18,45 +16,19 @@ import * as listRepo from "@kan/db/repository/list.repo";
 import * as memberRepo from "@kan/db/repository/member.repo";
 import * as userRepo from "@kan/db/repository/user.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
+import { checkSupabaseStorageConnection } from "@kan/shared/utils";
 
 import {
   adminProtectedProcedure,
   createTRPCRouter,
   publicProcedure,
 } from "../trpc";
-import { createS3Client } from "@kan/shared/utils";
 
 const checkDatabaseConnection = async (db: dbClient) => {
   try {
     await db.execute(sql`SELECT 1`);
     return true;
   } catch {
-    return false;
-  }
-};
-
-const checkS3Connection = async () => {
-  try {
-    // Check if S3 is configured
-    if (
-      !process.env.S3_ENDPOINT ||
-      !process.env.S3_ACCESS_KEY_ID ||
-      !process.env.S3_SECRET_ACCESS_KEY
-    ) {
-      // S3 is optional, so return true if not configured
-      return true;
-    }
-
-    const client = createS3Client();
-    const avatarBucketName = env("NEXT_PUBLIC_AVATAR_BUCKET_NAME");
-    const attachmentsBucketName = env("NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME");
-
-    await client.send(new HeadBucketCommand({ Bucket: avatarBucketName }));
-    await client.send(new HeadBucketCommand({ Bucket: attachmentsBucketName }));
-
-    return true;
-  } catch (error) {
-    console.error(error);
     return false;
   }
 };
@@ -84,22 +56,16 @@ export const healthRouter = createTRPCRouter({
     )
     .query(async ({ ctx }) => {
       const dbHealthy = await checkDatabaseConnection(ctx.db);
-      const s3Healthy = await checkS3Connection();
-      const s3Configured = !!(
-        process.env.S3_ENDPOINT &&
-        process.env.S3_ACCESS_KEY_ID &&
-        process.env.S3_SECRET_ACCESS_KEY
-      );
+      const storageStatus = await checkSupabaseStorageConnection();
 
       const database = dbHealthy ? "ok" : "error";
-      const storage = !s3Configured
-        ? "not_configured"
-        : s3Healthy
-          ? "ok"
-          : "error";
+      const storage = storageStatus;
 
       // Overall status is "ok" only if database is healthy and (storage is not configured or storage is healthy)
-      const status = dbHealthy && (!s3Configured || s3Healthy) ? "ok" : "error";
+      const status =
+        dbHealthy && (storageStatus === "not_configured" || storageStatus === "ok")
+          ? "ok"
+          : "error";
 
       return {
         status,
