@@ -4,7 +4,7 @@ import { twMerge } from "tailwind-merge";
 import LoadingSpinner from "./LoadingSpinner";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+  variant?: "primary" | "secondary" | "accent" | "danger" | "ghost";
   size?: "xs" | "sm" | "md" | "lg";
   isLoading?: boolean;
   iconLeft?: React.ReactNode;
@@ -47,6 +47,8 @@ const Button = ({
       "bg-light-1000 dark:bg-dark-1000 dark:text-dark-50",
     variant === "secondary" &&
       "border-[1px] border-light-600 bg-light-50 text-light-1000 dark:border-dark-600 dark:bg-dark-300 dark:text-dark-1000",
+    variant === "accent" &&
+      "bg-accent-500 text-white hover:bg-accent-600 dark:bg-accent-500 dark:text-white dark:hover:bg-accent-600",
     variant === "danger" &&
       "dark:text-red-1000 border-[1px] border-red-600 bg-red-500 dark:border-red-600 dark:bg-red-500",
     variant === "ghost" &&
