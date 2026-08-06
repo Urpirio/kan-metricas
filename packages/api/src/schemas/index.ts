@@ -34,6 +34,9 @@ export {
 
 export { listCreateResponseSchema, listUpdateResponseSchema } from "./list";
 
-export { memberInviteResponseSchema } from "./member";
+export {
+  memberInviteResponseSchema,
+  memberCreateAccountResponseSchema,
+} from "./member";
 
 export { attachmentConfirmResponseSchema } from "./attachment";
