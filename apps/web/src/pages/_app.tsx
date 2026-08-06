@@ -25,7 +25,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata = {
-  title: "Kan",
+  title: "Metricas",
   description: "The open source Trello alternative",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
