@@ -1,35 +1,31 @@
-import { toNodeHandler } from "better-auth/node";
+import type { NextApiRequest, NextApiResponse } from "next";
 
-import { initAuth } from "@kan/auth/server";
-import { createDrizzleClient } from "@kan/db/client";
-import { withRateLimit } from "@kan/api/utils/rateLimit";
+import { createLogger } from "@kan/logger";
 
-export const config = { api: { bodyParser: false } };
+const log = createLogger("auth-api");
 
-export const auth = initAuth(createDrizzleClient());
+/**
+ * Catch-all auth route handler.
+ *
+ * After replacing Better Auth with Supabase Auth, most authentication flows
+ * are handled client-side by `@supabase/supabase-js` (OAuth redirects, session
+ * management) or server-side via `@kan/auth/server` functions (getSession,
+ * signUpWithPassword, etc.).
+ *
+ * This route is preserved for backward compatibility with any client-side
+ * code that may still hit /api/auth/* endpoints, but it no longer proxies to
+ * a Better Auth handler.
+ */
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
+  log.warn(
+    { path: req.url, method: req.method },
+    "Request to legacy /api/auth/* endpoint — Better Auth has been replaced by Supabase Auth",
+  );
 
-const authHandler = toNodeHandler(auth.handler);
-
-export default withRateLimit(
-  { points: 100, duration: 60 },
-  async (req, res) => {
-    /**
-     * Better-auth behind proxies (Nginx/Cloudflare) can sometimes fail to parse the protocol
-     * if headers are incorrectly set or if there are multiple values in X-Forwarded-Proto.
-     * We sanitize these headers here to ensure better-auth gets a clean protocol and host.
-     */
-    const forwardedProto = req.headers["x-forwarded-proto"];
-    if (forwardedProto) {
-      const p = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
-      req.headers["x-forwarded-proto"] = p?.split(",")[0]?.trim();
-    }
-
-    const forwardedHost = req.headers["x-forwarded-host"];
-    if (forwardedHost) {
-      const h = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost;
-      req.headers["host"] = h?.split(",")[0]?.trim();
-    }
-
-    return await authHandler(req, res);
-  },
-);
+  res.status(404).json({
+    error: "Auth endpoint not found. Authentication is now handled via Supabase Auth.",
+  });
+}
