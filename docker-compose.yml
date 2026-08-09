@@ -48,13 +48,9 @@ services:
       # Admin API key (optional)
       - KAN_ADMIN_API_KEY=${KAN_ADMIN_API_KEY}
 
-      # SMTP (optional)
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      # Email via Resend (optional)
+      - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM=${EMAIL_FROM}
-      - SMTP_REJECT_UNAUTHORIZED=${SMTP_REJECT_UNAUTHORIZED}
 
       # Disable email features entirely (optional)
       - NEXT_PUBLIC_DISABLE_EMAIL=${NEXT_PUBLIC_DISABLE_EMAIL}
