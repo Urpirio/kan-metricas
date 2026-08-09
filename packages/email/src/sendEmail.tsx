@@ -1,45 +1,59 @@
 import { render } from "@react-email/render";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
+
 import { createLogger } from "@kan/logger";
 
 const log = createLogger("email");
 
+import CardStatusChangedTemplate from "./templates/card-status-changed";
 import JoinWorkspaceTemplate from "./templates/join-workspace";
 import MagicLinkTemplate from "./templates/magic-link";
 import MentionTemplate from "./templates/mention";
+import NewAccountTemplate from "./templates/new-account";
+import NewCommentTemplate from "./templates/new-comment";
 import ResetPasswordTemplate from "./templates/reset-password";
 
-type Templates = "MAGIC_LINK" | "JOIN_WORKSPACE" | "RESET_PASSWORD" | "MENTION";
+type Templates =
+  | "MAGIC_LINK"
+  | "JOIN_WORKSPACE"
+  | "RESET_PASSWORD"
+  | "MENTION"
+  | "NEW_ACCOUNT"
+  | "NEW_COMMENT"
+  | "CARD_STATUS_CHANGED";
 
 const emailTemplates: Record<Templates, React.ComponentType<any>> = {
   MAGIC_LINK: MagicLinkTemplate,
   JOIN_WORKSPACE: JoinWorkspaceTemplate,
   RESET_PASSWORD: ResetPasswordTemplate,
   MENTION: MentionTemplate,
+  NEW_ACCOUNT: NewAccountTemplate,
+  NEW_COMMENT: NewCommentTemplate,
+  CARD_STATUS_CHANGED: CardStatusChangedTemplate,
 };
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure:
-    process.env.SMTP_SECURE === undefined
-      ? true
-      : process.env.SMTP_SECURE?.toLowerCase() === "true",
-  tls: {
-    // do not fail on invalid certs
-    rejectUnauthorized:
-      process.env.SMTP_REJECT_UNAUTHORIZED === undefined
-        ? true
-        : process.env.SMTP_REJECT_UNAUTHORIZED?.toLowerCase() === "true",
-  },
-  ...(process.env.SMTP_USER &&
-    process.env.SMTP_PASSWORD && {
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-      },
-    }),
-});
+let _resend: Resend | null = null;
+
+/**
+ * Lazily resolves the Resend client so that importing this module doesn't
+ * blow up at build/boot time for self-hosted deployments that run without
+ * `RESEND_API_KEY` set (email sending simply isn't available in that case,
+ * same as the previous SMTP transport when `SMTP_HOST` was unset).
+ */
+function getResendClient(): Resend {
+  if (_resend) return _resend;
+
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      "Cannot send email: RESEND_API_KEY environment variable is not set.",
+    );
+  }
+
+  _resend = new Resend(apiKey);
+  return _resend;
+}
 
 export const sendEmail = async (
   to: string,
@@ -53,23 +67,34 @@ export const sendEmail = async (
 
     const html = await render(<EmailTemplate {...data} />, { pretty: true });
 
-    const options = {
-      from: process.env.EMAIL_FROM,
+    const from = process.env.EMAIL_FROM;
+
+    if (!from) {
+      throw new Error(
+        "Cannot send email: EMAIL_FROM environment variable is not set.",
+      );
+    }
+
+    const resend = getResendClient();
+
+    const { data: response, error } = await resend.emails.send({
+      from,
       to,
       subject,
       html,
-    };
+    });
 
-    const response = await transporter.sendMail(options);
-
-    if (!response.accepted.length) {
-      throw new Error(`Failed to send email: ${response.response}`);
+    if (error) {
+      throw new Error(`Failed to send email: ${error.message}`);
     }
 
-    log.info({ to, subject, template, messageId: response.messageId }, "Email sent");
+    log.info({ to, subject, template, messageId: response?.id }, "Email sent");
     return response;
   } catch (error) {
-    log.error({ err: error, to, from: process.env.EMAIL_FROM, subject, template }, "Email sending failed");
+    log.error(
+      { err: error, to, from: process.env.EMAIL_FROM, subject, template },
+      "Email sending failed",
+    );
     throw error;
   }
 };
