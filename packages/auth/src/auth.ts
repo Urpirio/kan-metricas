@@ -56,21 +56,6 @@ export async function signInWithPassword({
 }
 
 /**
- * Send a password reset email using Supabase Auth.
- */
-export async function resetPasswordForEmail(email: string) {
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email);
-
-  if (error) {
-    log.error({ err: error }, "Supabase Auth resetPasswordForEmail failed");
-    return { data: null, error };
-  }
-
-  return { data, error: null };
-}
-
-/**
  * Sign out the current user using Supabase Auth.
  */
 export async function signOut() {
