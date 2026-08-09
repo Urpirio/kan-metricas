@@ -253,6 +253,20 @@
       "when": 1785933111781,
       "tag": "20260805123151_AddApiKeysTable",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1786012800000,
+      "tag": "20260806120000_AddRealtimeBoardPolicies",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1786314002019,
+      "tag": "20260809222002_AddCommentAndStatusChangedNotificationTypes",
+      "breakpoints": true
     }
   ]
 }
