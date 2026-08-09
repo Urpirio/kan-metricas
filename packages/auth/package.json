@@ -38,6 +38,7 @@
   },
   "prettier": "@kan/prettier-config",
   "dependencies": {
+    "@kan/email": "workspace:*",
     "@kan/logger": "workspace:^",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.112.0",
