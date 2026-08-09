@@ -1,0 +1,2 @@
+ALTER TYPE "public"."notification_type" ADD VALUE 'comment' BEFORE 'workspace.member.added';--> statement-breakpoint
+ALTER TYPE "public"."notification_type" ADD VALUE 'card.status_changed' BEFORE 'workspace.member.added';
