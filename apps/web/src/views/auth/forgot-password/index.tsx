@@ -6,12 +6,11 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { authClient } from "@kan/auth/client";
-
 import AuthLayout from "~/components/AuthLayout";
 import Button from "~/components/Button";
 import Input from "~/components/Input";
 import { PageHead } from "~/components/PageHead";
+import { api } from "~/utils/api";
 
 const Schema = z.object({ email: z.string().email() });
 
@@ -20,7 +19,6 @@ type FormValues = z.infer<typeof Schema>;
 export default function ForgotPasswordPage() {
   const [isSent, setIsSent] = useState(false);
   const [recipient, setRecipient] = useState("");
-  const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const {
@@ -29,22 +27,21 @@ export default function ForgotPasswordPage() {
     formState: { errors },
   } = useForm<FormValues>({ resolver: zodResolver(Schema) });
 
-  const onSubmit = async (values: FormValues) => {
-    setIsPending(true);
+  // Sent via Resend (see packages/auth/src/magic-link.ts::sendPasswordResetEmail)
+  // instead of Supabase Auth's own emailer.
+  const requestPasswordReset = api.user.requestPasswordReset.useMutation({
+    onSuccess: (_data, variables) => {
+      setRecipient(variables.email);
+      setIsSent(true);
+    },
+    onError: () => {
+      setError(t`Please try again later, or contact customer support.`);
+    },
+  });
+
+  const onSubmit = (values: FormValues) => {
     setError(null);
-
-    await authClient.requestPasswordReset(
-      { email: values.email },
-      {
-        onSuccess: () => {
-          setRecipient(values.email);
-          setIsSent(true);
-        },
-        onError: ({ error }) => setError(error.message),
-      },
-    );
-
-    setIsPending(false);
+    requestPasswordReset.mutate({ email: values.email });
   };
 
   return (
@@ -89,7 +86,7 @@ export default function ForgotPasswordPage() {
 
               <div className="mt-6">
                 <Button
-                  isLoading={isPending}
+                  isLoading={requestPasswordReset.isPending}
                   fullWidth
                   size="lg"
                   variant="accent"
