@@ -11,6 +11,9 @@ import { Text } from "@react-email/text";
 import { env } from "next-runtime-env";
 import * as React from "react";
 
+import { BODY_FONT_FAMILY, BRAND_NAVY, BRAND_RED } from "./colors";
+import { EmailLogo } from "./EmailLogo";
+
 export const MentionTemplate = ({
   commenterName,
   boardName,
@@ -25,43 +28,33 @@ export const MentionTemplate = ({
   <Html>
     <Head />
     <Preview>
-      {commenterName} mentioned you in a comment on {cardTitle}
+      {commenterName} te mencionó en un comentario en {cardTitle}
     </Preview>
     <Body style={{ backgroundColor: "white" }}>
       <Container
         style={{
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
+          fontFamily: BODY_FONT_FAMILY,
           margin: "auto",
           paddingLeft: "0.75rem",
           paddingRight: "0.75rem",
         }}
       >
+        <EmailLogo />
         <Heading
-          style={{
-            marginTop: "2.5rem",
-            marginBottom: "2.5rem",
-            fontSize: "24px",
-            fontWeight: "bold",
-            color: "#232323",
-          }}
+          style={{ fontSize: "24px", fontWeight: "bold", color: BRAND_NAVY }}
         >
-          kan.bn
-        </Heading>
-        <Heading
-          style={{ fontSize: "24px", fontWeight: "bold", color: "#232323" }}
-        >
-          You were mentioned in a comment
+          Te mencionaron en un comentario
         </Heading>
         <Text
           style={{
             fontSize: "0.875rem",
             marginBottom: "1rem",
-            color: "#232323",
+            color: BRAND_NAVY,
           }}
         >
-          <strong>{commenterName}</strong> mentioned you in a comment on the
-          card <strong>{cardTitle}</strong> in the board <strong>{boardName}</strong>.
+          <strong>{commenterName}</strong> te mencionó en un comentario en la
+          tarjeta <strong>{cardTitle}</strong> del tablero{" "}
+          <strong>{boardName}</strong>.
         </Text>
         <Button
           target="_blank"
@@ -69,7 +62,7 @@ export const MentionTemplate = ({
           style={{
             marginBottom: "2rem",
             borderRadius: "0.375rem",
-            backgroundColor: "#282828",
+            backgroundColor: BRAND_RED,
             paddingLeft: "1.5rem",
             paddingRight: "1.5rem",
             paddingTop: "1rem",
@@ -80,7 +73,7 @@ export const MentionTemplate = ({
             color: "white",
           }}
         >
-          View Card
+          Ver tarjeta
         </Button>
         <Hr
           style={{
@@ -95,9 +88,9 @@ export const MentionTemplate = ({
             target="_blank"
             style={{ color: "#7e7e7e", textDecoration: "underline" }}
           >
-            Kan
+            Metricas
           </Link>
-          , the open source Trello alternative.
+          , la alternativa open source a Trello.
         </Text>
       </Container>
     </Body>
@@ -105,4 +98,3 @@ export const MentionTemplate = ({
 );
 
 export default MentionTemplate;
-
