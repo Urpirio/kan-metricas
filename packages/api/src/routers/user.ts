@@ -1,13 +1,35 @@
 import { TRPCError } from "@trpc/server";
+import { env } from "next-runtime-env";
 import { z } from "zod";
 
-import { deleteUser } from "@kan/auth/server";
+import { deleteUser, sendPasswordResetEmail } from "@kan/auth/server";
 import * as userRepo from "@kan/db/repository/user.repo";
 import { generateAvatarUrl } from "@kan/shared/utils";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 export const userRouter = createTRPCRouter({
+  requestPasswordReset: publicProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/users/request-password-reset",
+        summary: "Request a password reset email",
+        description:
+          "Sends a password reset link to the given email if an account exists for it. Always reports success to avoid revealing whether an email is registered.",
+        tags: ["Users"],
+        protect: false,
+      },
+    })
+    .input(z.object({ email: z.string().email() }))
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const baseUrl = env("NEXT_PUBLIC_BASE_URL") ?? "";
+
+      await sendPasswordResetEmail(input.email, baseUrl);
+
+      return { success: true };
+    }),
   getUser: protectedProcedure
     .meta({
       openapi: {
