@@ -34,6 +34,21 @@ function getSupabase(): SupabaseClient {
   return _supabase;
 }
 
+/**
+ * Returns the same cookie-backed Supabase browser client singleton used for
+ * sign-in/sign-up/session state (see the module doc comment above).
+ *
+ * Any browser-side code that needs to act as the current user — including
+ * Realtime `postgres_changes` subscriptions, whose RLS policies rely on
+ * `auth.uid()` — must go through this singleton rather than constructing a
+ * fresh client (e.g. via `createClient` from `@supabase/supabase-js`), since
+ * only this cookie-backed client actually carries the logged-in user's
+ * session/JWT.
+ */
+export function getSupabaseBrowserClient(): SupabaseClient {
+  return getSupabase();
+}
+
 interface SessionUser {
   id: string;
   email: string;
@@ -193,35 +208,11 @@ export const authClient = {
     await getSupabase().auth.signOut();
   },
 
-  /**
-   * Sends a password recovery email. Supabase delivers a link that, once
-   * opened, establishes a short-lived recovery session and redirects to
-   * `redirectTo`, where the new password can be set via `updatePassword`.
-   *
-   * Runs against the browser client (anon key) so the recovery session is
-   * persisted in cookies for the reset page to pick up.
-   */
-  requestPasswordReset: async (
-    body: { email: string },
-    opts?: {
-      onSuccess?: () => void;
-      onError?: (ctx: { error: { message: string } }) => void;
-    },
-  ) => {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin;
-
-    const { error } = await getSupabase().auth.resetPasswordForEmail(
-      body.email,
-      { redirectTo: `${baseUrl}/reset-password` },
-    );
-
-    if (error) {
-      opts?.onError?.({ error: { message: error.message } });
-      return;
-    }
-
-    opts?.onSuccess?.();
-  },
+  // Password reset requests go through the `user.requestPasswordReset` tRPC
+  // mutation (packages/api/src/routers/user.ts), which sends a
+  // Resend-branded email via `sendPasswordResetEmail`
+  // (packages/auth/src/magic-link.ts) instead of Supabase Auth's own
+  // emailer. See apps/web/src/views/auth/forgot-password.
 
   /**
    * Sets a new password for the user in the current (recovery) session.
