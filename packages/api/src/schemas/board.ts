@@ -51,6 +51,14 @@ const boardDetailCardSchema = z.object({
 // ─── board.byId ──────────────────────────────────────────────
 export const boardDetailSchema = z.object({
   publicId: z.string(),
+  // Internal numeric id, exposed as a deliberate exception to the
+  // publicId-only convention used everywhere else in the API. It exists
+  // solely so the client can filter a Supabase Realtime `postgres_changes`
+  // subscription on `card`/`list`, whose rows only carry the internal
+  // `boardId`/`listId` — Realtime filters operate on raw column values and
+  // cannot join through `publicId`. Not used for any other purpose and
+  // never sent in mutations.
+  id: z.number(),
   name: z.string(),
   slug: z.string(),
   visibility: z.string(),
