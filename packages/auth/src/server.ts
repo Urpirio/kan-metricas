@@ -21,4 +21,5 @@ export {
   completeInvite,
   sendMagicLink,
   sendInviteMagicLink,
+  sendPasswordResetEmail,
 } from "./magic-link";
