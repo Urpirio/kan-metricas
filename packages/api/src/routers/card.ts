@@ -20,7 +20,11 @@ import {
 } from "../schemas";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { mergeActivities } from "../utils/activities";
-import { sendMentionEmails } from "../utils/notifications";
+import {
+  sendCardStatusChangedEmails,
+  sendMentionEmails,
+  sendNewCommentEmails,
+} from "../utils/notifications";
 import {
   assertCanDelete,
   assertCanEdit,
@@ -285,6 +289,19 @@ export const cardRouter = createTRPCRouter({
         commentId: newComment.id,
       }).catch((error) => {
         console.error("Failed to send mention emails:", error);
+      });
+
+      // Notifies the card's assigned members regardless of @mentions.
+      // Separate from sendMentionEmails above: a member can get both emails
+      // for the same comment (mentioned AND assigned), which is intentional.
+      sendNewCommentEmails({
+        db: ctx.db,
+        cardPublicId: input.cardPublicId,
+        commentHtml: input.comment,
+        commenterUserId: userId,
+        commentId: newComment.id,
+      }).catch((error) => {
+        console.error("Failed to send new comment emails:", error);
       });
 
       return newComment;
@@ -1030,6 +1047,16 @@ export const cardRouter = createTRPCRouter({
           createdBy: userId,
           fromListId: existingCard.listId,
           toListId: newListId,
+        });
+
+        sendCardStatusChangedEmails({
+          db: ctx.db,
+          cardPublicId: input.cardPublicId,
+          actorUserId: userId,
+          fromListName: existingCard.list.name,
+          toListName: newList?.name ?? "",
+        }).catch((error) => {
+          console.error("Failed to send card status changed emails:", error);
         });
       }
 
