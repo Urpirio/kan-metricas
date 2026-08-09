@@ -1,7 +1,6 @@
 export {
   signUpWithPassword,
   signInWithPassword,
-  resetPasswordForEmail,
   signOut,
   getSession,
   deleteUser,
