@@ -27,6 +27,7 @@ import PatternedBackground from "~/components/PatternedBackground";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
 import { Tooltip } from "~/components/Tooltip";
 import { EditYouTubeModal } from "~/components/YouTubeEmbed/EditYouTubeModal";
+import { useBoardRealtime } from "~/hooks/useBoardRealtime";
 import { useDragToScroll } from "~/hooks/useDragToScroll";
 import { usePermissions } from "~/hooks/usePermissions";
 import { useScrollRestore } from "~/hooks/useScrollRestore";
@@ -163,6 +164,12 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
   const refetchBoard = async () => {
     if (boardId) await utils.board.byId.refetch({ boardPublicId: boardId });
   };
+
+  // Refetch the board when another user changes a card/list on it, so
+  // multiple people viewing the same board see each other's edits without a
+  // manual reload. See useBoardRealtime for the authorization model and its
+  // known imprecision on which card changes trigger a refetch.
+  useBoardRealtime(boardData?.id, refetchBoard);
 
   useEffect(() => {
     if (boardId) {
