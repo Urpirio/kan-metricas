@@ -18,6 +18,8 @@ import { workspaces } from "./workspaces";
 
 export const notificationTypes = [
   "mention",
+  "comment",
+  "card.status_changed",
   "workspace.member.added",
   "workspace.member.removed",
   "workspace.role.changed",
