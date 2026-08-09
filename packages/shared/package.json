@@ -19,6 +19,10 @@
     "./utils/supabase-server": {
       "types": "./src/utils/supabase-server.ts",
       "default": "./src/utils/supabase-server.ts"
+    },
+    "./utils/supabase": {
+      "types": "./src/utils/supabase.ts",
+      "default": "./src/utils/supabase.ts"
     }
   },
   "license": "GPL-3.0",
