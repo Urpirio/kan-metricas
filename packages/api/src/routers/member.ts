@@ -8,6 +8,7 @@ import * as permissionRepo from "@kan/db/repository/permission.repo";
 import * as subscriptionRepo from "@kan/db/repository/subscription.repo";
 import * as userRepo from "@kan/db/repository/user.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
+import { sendEmail } from "@kan/email";
 import { createLogger } from "@kan/logger";
 import {
   generatePassword,
@@ -230,6 +231,27 @@ export const memberRouter = createTRPCRouter({
           message: `Unable to create account for ${input.email}`,
           code: "INTERNAL_SERVER_ERROR",
         });
+
+      // Fire-and-forget: the mutation still returns the temporary password
+      // to the admin (see memberCreateAccountResponseSchema) so the account
+      // is usable even if the email fails to send.
+      sendEmail(
+        input.email,
+        `Tu cuenta en ${workspace.name} está lista`,
+        "NEW_ACCOUNT",
+        {
+          name: input.name,
+          email: input.email,
+          temporaryPassword,
+          workspaceName: workspace.name,
+          loginUrl: `${env("NEXT_PUBLIC_BASE_URL") ?? ""}/login`,
+        },
+      ).catch((error) => {
+        log.error(
+          { err: error, email: input.email },
+          "Failed to send new account credentials email",
+        );
+      });
 
       return {
         publicId: member.publicId,
