@@ -11,6 +11,9 @@ import { Text } from "@react-email/text";
 import { env } from "next-runtime-env";
 import * as React from "react";
 
+import { BODY_FONT_FAMILY, BRAND_NAVY, BRAND_RED } from "./colors";
+import { EmailLogo } from "./EmailLogo";
+
 export const MagicLinkTemplate = ({
   magicLoginUrl,
 }: {
@@ -18,41 +21,30 @@ export const MagicLinkTemplate = ({
 }) => (
   <Html>
     <Head />
-    <Preview>Log in with this magic link</Preview>
+    <Preview>Inicia sesión con este enlace mágico</Preview>
     <Body style={{ backgroundColor: "white" }}>
       <Container
         style={{
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
+          fontFamily: BODY_FONT_FAMILY,
           margin: "auto",
           paddingLeft: "0.75rem",
           paddingRight: "0.75rem",
         }}
       >
+        <EmailLogo />
         <Heading
-          style={{
-            marginTop: "2.5rem",
-            marginBottom: "2.5rem",
-            fontSize: "24px",
-            fontWeight: "bold",
-            color: "#232323",
-          }}
+          style={{ fontSize: "24px", fontWeight: "bold", color: BRAND_NAVY }}
         >
-          kan.bn
-        </Heading>
-        <Heading
-          style={{ fontSize: "24px", fontWeight: "bold", color: "#232323" }}
-        >
-          Login to your Kan account
+          Inicia sesión en tu cuenta de Metricas
         </Heading>
         <Text
           style={{
             fontSize: "0.875rem",
             marginBottom: "2rem",
-            color: "#232323",
+            color: BRAND_NAVY,
           }}
         >
-          Click the button below to instantly login to your account.
+          Haz clic en el botón de abajo para iniciar sesión al instante.
         </Text>
         <Button
           target="_blank"
@@ -60,7 +52,7 @@ export const MagicLinkTemplate = ({
           style={{
             marginBottom: "2rem",
             borderRadius: "0.375rem",
-            backgroundColor: "#282828",
+            backgroundColor: BRAND_RED,
             paddingLeft: "1.5rem",
             paddingRight: "1.5rem",
             paddingTop: "1rem",
@@ -71,7 +63,7 @@ export const MagicLinkTemplate = ({
             color: "white",
           }}
         >
-          Login to your account
+          Iniciar sesión
         </Button>
         <Text
           style={{
@@ -80,7 +72,8 @@ export const MagicLinkTemplate = ({
             color: "#7e7e7e",
           }}
         >
-          If you didn&apos;t try to login, you can safely ignore this email.
+          Si no intentaste iniciar sesión, puedes ignorar este correo sin
+          problema.
         </Text>
         <Hr
           style={{
@@ -95,9 +88,9 @@ export const MagicLinkTemplate = ({
             target="_blank"
             style={{ color: "#7e7e7e", textDecoration: "underline" }}
           >
-            Kan
+            Metricas
           </Link>
-          , the open source Trello alternative.
+          , la alternativa open source a Trello.
         </Text>
       </Container>
     </Body>
