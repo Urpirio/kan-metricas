@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-Kan is an open-source project management tool (Trello alternative) built with:
+Metricas (a fork of the open-source "Kan" project management tool / Trello alternative) built with:
 
 - **Frontend**: Next.js, React, TypeScript, Tailwind CSS
 - **Backend**: tRPC, Node.js
-- **Database**: PostgreSQL with Drizzle ORM
+- **Database**: PostgreSQL with Drizzle ORM, hosted on Supabase
 - **Monorepo**: pnpm workspaces with Turbo
-- **Auth**: Better Auth
+- **Auth**: Supabase Auth
 - **Internationalization**: Lingui
 
 ## Setup Commands
