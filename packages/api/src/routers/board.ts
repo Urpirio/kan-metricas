@@ -206,6 +206,7 @@ export const boardRouter = createTRPCRouter({
 
       return {
         ...result,
+        id: board.id,
         lists: listsWithAvatarUrls,
         workspace: workspaceWithAvatarUrls,
       };
