@@ -32,8 +32,11 @@ type CreateAccountFormValues = z.infer<typeof CreateAccountSchema>;
 
 /**
  * Result of the most recently created account, shown once so the admin can
- * copy the credentials and share them with the new member. The password is
- * never retrievable again after this modal closes.
+ * copy the credentials and share them with the new member. The same
+ * credentials are also emailed to the new member directly (see
+ * `NEW_ACCOUNT` in packages/api/src/routers/member.ts), but that send is
+ * fire-and-forget, so this modal remains the reliable fallback — the
+ * password is never retrievable again from the UI after this modal closes.
  */
 interface CreatedAccount {
   email: string;
@@ -363,7 +366,7 @@ export function InviteMemberForm({
         </div>
 
         <p className="mt-2 text-xs text-gray-500 dark:text-dark-900">
-          {t`Creates an active account with a system-generated password. No invitation email is sent — you'll get the credentials to share directly.`}
+          {t`Creates an active account with a system-generated password and emails the credentials to the new member. You'll also get a copy here to share directly if needed.`}
         </p>
 
         {!isFreePlan && (
